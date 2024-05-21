@@ -34,7 +34,7 @@ public class SudokuSolver {
             try {
                 if (i == 1) {
                     // Set the path to tessdata and specify the language for OCR
-                    tesseract.setDatapath("/Users/andrewpols/Downloads/tessdata_shreetest-master");
+                    tesseract.setDatapath("tessdata_digits");
                     tesseract.setLanguage("digits");
                 }
 
@@ -44,7 +44,7 @@ public class SudokuSolver {
                 // Remove all non-digit characters from the OCR result
                 output = output.replaceAll("[^0-9]", "");
 
-                // If OCR result is empty, set it to "0"
+                // If OCR result is empty, set it to "0"`
                 if (output.isEmpty()) {
                     output = "0";
                 }

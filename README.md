@@ -24,18 +24,20 @@
     - Add the OpenCV and Tesseract libraries to your project's build path.
 
 4. **Configure Library Path:**
-    - If you're using a dynamic library (e.g., `.dylib` for MacOS), ensure that the library path is correctly set:
+    - If you're using a dynamic library (e.g., `.dylib` for MacOS, `.dll` for Windows), ensure that the library path is correctly set:
       ```bash
-      java -Djava.library.path=/path/to/libraries -jar your_application.jar
+      -Djava.library.path=/path/to/libraries
       ```
+    - Here is a [tutorial](https://youtu.be/IpYZEOJZK6U?si=qU-kgztEO44rDWNi) in setting the `.dll` OpenCV library path for Windows
 
 5. **Build the Project:**
     - Open the project in your preferred Java IDE (e.g., IntelliJ IDEA, Eclipse).
+    - Ensure JDK is up-to-date (JDK 21).
     - Build the project to resolve dependencies and compile the source code.
 
 6. **Run the Program:**
     - Ensure that the required libraries (OpenCV and Tesseract OCR) are properly configured and accessible in your project.
-    - Run the main class (`SudokuCV.java`) to start the Sudoku Solver application.
+    - ***Run the main class*** (`SudokuCV.java`) to start the Sudoku Solver application.
 
 ## Usage
 
@@ -51,6 +53,10 @@
   - After creating a Sudoku Solving algorithm, I found it was far too time-consuming to manually
     input the data of the grid manually. 
   - Using computer vision automates this process, allowing quick, real-time solutions
+- **Tips For Use:**
+  - If using the video capture, try to ensure that you have the proper brightness/lighting for the camera
+    to detect the grid. Inadequate lighting leads to rendering and processing issues.
+    - Try performing the video capture in a well-lit room, and consider turning your computer's brightness up.
 
 ## Tutorial: Image Examples
 
@@ -69,6 +75,6 @@
 ![Warped Perspective Image](docs/images/stream_img.jpg)
 ![Removed Lines](docs/images/rmv.jpg)
 ![Solved](docs/images/solved.png)
-[Extracted Cells](./docs/data/cells)
+- [Extracted Cells](./docs/data/cells)
 
 
