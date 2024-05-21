@@ -1,243 +1,199 @@
+// This file takes the extracted cells from HoughLines and runs an OCR to attain
+// an array of the Sudoku grid. This array is used in an algorithm that solves the puzzle
+// and returns the solution on an image at the end.
+
+// Import necessary libraries
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
+import org.opencv.core.*;
+import org.opencv.core.Point;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
 
-import java.awt.*;
-import java.awt.event.InputEvent;
-import java.awt.event.KeyEvent;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 
 public class SudokuSolver {
 
-    // Initialize arrays to perform the solving algorithm
+    // Initialize the main array for the Sudoku grid
     static int[][] sudokuArray = new int[9][9];
+    static boolean isPuzzleSolved = true;
 
-    // A copy of the array is used to recognize where the predefined numbers exist
-    // to avoid typing that item out after solving
+    // A copy of the Sudoku grid to keep track of predefined numbers
     static int[][] sudokuCopy = new int[9][9];
 
-    // This method takes the extracted cell images in the data directory
-    // and performs an OCR with Tess4J (Tesseract for Java), placing the read values into the Sudoku array
-    public void getCellOCR() {
-
-        ArrayList<String> cellData = new ArrayList<>(); // Initialize and assign list of data to be read
-
-        Tesseract tesseract = new Tesseract(); // Instantiate tess obj
+    // This method performs OCR on the cell images and fills the Sudoku grid
+    public static void getCellOCR() {
+        ArrayList<String> cellData = new ArrayList<>(); // List to store OCR results for each cell
+        Tesseract tesseract = new Tesseract(); // Instantiate Tesseract object
 
         // Loop through the 81 cell images
-        for (int i=1; i<=81; i++) {
+        for (int i = 1; i <= 81; i++) {
             try {
-                if (i==1) {
-
-                    // Tesseract must be directed to the path containing the tessdata to properly operate
-                    tesseract.setDatapath("/usr/local/Cellar/tesseract/5.3.4_1/share/tessdata");
+                if (i == 1) {
+                    // Set the path to tessdata and specify the language for OCR
+                    tesseract.setDatapath("/Users/andrewpols/Downloads/tessdata_shreetest-master");
+                    tesseract.setLanguage("digits");
                 }
 
-                System.out.println("\n On Image Number: " + i); // For terminal update purposes
+                // Perform OCR on the cell image
+                String output = tesseract.doOCR(new File("data/cells/cell_" + i + ".png"));
 
-                // This is the actual OCR command for Tesseract
-                // Each cell follows the name: "Cell_number.jpg", where number is denoted by i
-                String output = tesseract.doOCR(new File("data/Cell_" + i + ".jpg"));
+                // Remove all non-digit characters from the OCR result
+                output = output.replaceAll("[^0-9]", "");
 
-                // If tesseract does not read anything in the cell, that is represented by a zero in the array
+                // If OCR result is empty, set it to "0"
                 if (output.isEmpty()) {
                     output = "0";
                 }
 
-                // Tesseract sometimes adds unnecessary spaces or characters following the read character
-                // To offset this, only consider the first character as the output
+                // Consider only the first character if OCR result has multiple characters
                 output = String.valueOf(output.charAt(0));
 
-                // Add the read String into the list
+                // Add the processed OCR result to the list
                 cellData.add(output);
 
-            }
-            catch (TesseractException e) {
+            } catch (TesseractException e) {
                 e.printStackTrace();
             }
         }
 
-        // Tesseract reads in reverse order, so we reverse the cell data list
-        Collections.reverse(cellData);
+        System.out.println("1D Array Data: " + cellData); // Print the OCR results for debugging
 
-        System.out.println(cellData); // debugging purposes
-
-        // Convert into 2D Array
-        // rowCounter marks the row we are on, and will increment every 9th column
+        // Convert the list of OCR results to a 2D array
         int rowCounter = 0;
-        // columnCounter marks the column we are on, and increments every iteration,
-        // but resets to 0 after every 9th column
         int columnCounter = 0;
 
         Iterator<String> iter = cellData.iterator();
+        while (rowCounter < 9) {
+            sudokuArray[rowCounter][columnCounter] = Integer.parseInt(iter.next()); // Fill the main array
+            sudokuCopy[rowCounter][columnCounter] = sudokuArray[rowCounter][columnCounter]; // Fill the copy array
+            columnCounter++;
 
-        while(rowCounter < 9) {
-            sudokuArray[rowCounter][columnCounter] = Integer.parseInt(iter.next()); // set array item to the parsed int
-            columnCounter++; // move to next column
-
-            // If we're on the last column (9th), move on to the next row and reset columnCounter to 0
+            // Move to the next row after every 9 columns
             if (columnCounter == 9) {
                 columnCounter = 0;
                 rowCounter++;
             }
-
         }
 
-        sudokuCopy = sudokuArray.clone(); // Now with the input data, clone the array mentioned earlier
-
-        System.out.println("Copy: " + Arrays.deepToString(sudokuCopy));
+        System.out.println("2D Array Data: " + Arrays.deepToString(sudokuArray)); // Print the copy array for debugging
     }
 
-    // This method takes a possible number (taken from the answerPuzzle method) and checks if its valid within the grid
-    // eg. For possibleNumber = 2, is there a 2 in the row, column, or 3x3 grid in which we are checking?
-    // So, we return true if possible and false if not possible
+    // Method to check if placing a number at a given position is valid
     public Boolean isPossible(int row, int column, int possibleNumber) {
 
-        // Check the row of the possible number
+        // Check if the number already exists in the current row
         for (int i = 0; i < sudokuArray.length; i++) {
-            // If the same number exists in the row, we violate the rules and so return false
             if (sudokuArray[row][i] == possibleNumber) {
                 return false;
             }
         }
 
-        // If the same number exists in the column, we violate the rules and so return false
-        for (int i = 0; i < sudokuArray[i].length; i++) {
+        // Check if the number already exists in the current column
+        for (int i = 0; i < sudokuArray.length; i++) {
             if (sudokuArray[i][column] == possibleNumber) {
                 return false;
             }
         }
 
-        // Algorithm for checking the 3x3 grid
-        // In each grid, the starting row/column will be in the form of 3k, for some integer k
-        // Thus, each starting row/column is divisible by 3. To get to this starting column,
-        // we divide our current column by 3, ROUND DOWN, and then multiply by 3, getting us to the nearest multiple of 3
-        // eg. currColumn = 5; currColumn floor div by 3 =  5 / 3 = 1.66667 = 1 * 3 = 3 (colOrigin = 3)
+        // Determine the starting indices of the 3x3 sub-grid
         int columnOrigin = Math.floorDiv(column, 3) * 3;
         int rowOrigin = Math.floorDiv(row, 3) * 3;
 
-        // Loop through the starting col/row, PLUS the 2 cols/rows following the origin
-        // This allows us to loop through the 3x3 grid
+        // Check if the number already exists in the 3x3 sub-grid
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
-                // If the same number exists in the 3x3 grid, we violate the rules and so return false
                 if (sudokuArray[rowOrigin + i][columnOrigin + j] == possibleNumber) {
                     return false;
                 }
             }
         }
 
-        // If we've passed all the previous conditions, we have not violated the rules and so return true
+        // If the number doesn't exist in the row, column, or 3x3 sub-grid, it is valid
         return true;
     } // end isPossible() method
 
-
-    // This method is what actually comes up with the solution for the grid.
-    // We start in the 0,0 index (top left) and perform the following check in the method.
-
-    /*
-    If it passes the isPossible() conditions, we continue and call the function recursively.
-    For a recursive method, we take the updated SudokuArray and call the function again.
-    If we keep passing the isPossible() conditions, we continue calling recursively until the board is filled and we return true
-    If at any point we fail the isPossible() conditions, we return false on the last recursive call,
-    return back to the previous call, update the row-col to 0, and try again with a new number
-    */
+    // Recursive method to solve the Sudoku puzzle using backtracking
     public boolean answerPuzzle(int[][] sudokuArray) {
+        // Loop through rows and columns
         for (int row = 0; row < sudokuArray.length; row++) {
             for (int column = 0; column < sudokuArray.length; column++) {
-                if (sudokuArray[row][column] == 0) {
-                    for (int possibleNumber = 1; possibleNumber < sudokuArray.length + 1; possibleNumber++) {
+                if (sudokuArray[row][column] == 0) { // Check for empty cells
+                    // Check possibilities of numbers recursively, starting at one
+                    for (int possibleNumber = 1; possibleNumber <= 9; possibleNumber++) {
                         if (isPossible(row, column, possibleNumber)) {
+                            sudokuArray[row][column] = possibleNumber; // Place the number
 
-                            sudokuArray[row][column] = possibleNumber;
-
+                            // Recursively attempt to fill in the rest of the grid
                             if (answerPuzzle(sudokuArray)) {
                                 return true;
                             } else {
-                                sudokuArray[row][column] = 0;
+                                sudokuArray[row][column] = 0; // Reset the cell if it leads to no solution
                             }
                         }
                     }
-                    return false;
+                    return false; // Return false if no valid number is found for the current cell
                 }
             }
         }
-
-        return true;
+        return true; // Return true if the entire grid is filled without conflict
     } // end of answerPuzzle() method
 
+    // This method draws the solution numbers on the Sudoku grid image
+    public static Mat drawSolutions(Mat src) {
+        System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
 
-    // This method takes the fully updated sudokuArray and simulates the key strokes needed to type out
-    // the answer on a web-based Sudoku puzzle
-    public void typeSudokuAnswer() {
-        try {
-            Robot robot = new Robot(); // instantiate Robot obj needed to access keyboard
+        // Get cell dimensions (it's an even 9x9 grid, so each cell will have 1/9 of the image's height & width)
+        int cellWidth = src.width() / 9;
+        int cellHeight = src.height() / 9;
 
-            // After the code starts running, the cursor will take priority in the terminal.
-            // To work around this, we press the mouse on the cell we were in to get back to the website
-            robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
+        // Loop through the 2D sudokuCopy array
+        for (int i = 0; i < sudokuCopy.length; i++) {
+            for (int j = 0; j < sudokuCopy[i].length; j++) {
+                if (sudokuCopy[i][j] == 0) { // Check if the cell was initially empty
+                    // Experimental values of positions that worked for all tested puzzles
+                    double xPos = cellWidth * j + cellWidth * 0.25;
+                    double yPos = cellHeight * i + cellHeight * 0.80;
 
-            System.out.println(Arrays.deepToString(sudokuCopy)); // print for debugging purposes
+                    int currentInput = sudokuArray[i][j]; // Get the solved number for the cell
 
+                    // Draw the solved number on the image
+                    Imgproc.putText(src, String.valueOf(currentInput), new Point(xPos, yPos), 4, 1.5,
+                            new Scalar(255, 127, 100), 2);
 
-            // Simple loop through the 2D sudokuArray
-            for (int i = 0; i < sudokuArray.length; i++) {
-
-                // We will loop through all the columns except the last one, which will have its own set of commands
-                for (int j = 0; j < sudokuArray[i].length - 1; j++) {
-                    if (sudokuCopy[i][j] == 0) { // if empty, we update (this is where sudokuCopy is useful)
-
-                        // get the current number for the row-col in sudokuArray
-                        int currentInput = sudokuArray[i][j];
-
-                        // 48 is the keycode for zero in Robot. Subsequent numbers will follow 48.
-                        // eg. 48 + 2 = "2"
-                        robot.keyPress(48 + currentInput); // press key for currNum
-
-                    }
-
-                    robot.keyPress(KeyEvent.VK_RIGHT); // move right to next cell
-
-                    // Proceed if we are on the second last column
-                    if (j==7) {
-                          robot.keyPress(48 + sudokuArray[i][j+1]); // Type the last number of the col
-                          // Only proceed if not on the last row (otherwise, on some websites, this sends us back to Cell 1)
-                          if (i!=8) {
-                              robot.keyPress(KeyEvent.VK_DOWN); // Move down a row
-                              for (int k=0; k<8; k++) {
-                                  robot.keyPress(KeyEvent.VK_LEFT); // Move left 8 times to get back to col 1 of the next row
-
-                              }
-                          }
+                    if (sudokuArray[i][j] == 0) {
+                        isPuzzleSolved = false;
                     }
                 }
             }
-        } catch (AWTException e) {
-            e.getStackTrace();
         }
 
-    } // end of typeSudokuAnswer() method
+        // Save the solved Sudoku image
+        Imgcodecs.imwrite("data/images/solved.png", src);
 
+        return src;
+    } // end of drawSolutions() method
 
-    public static void main(String[] args) {
+    public static void main(String... args) {
 
-        System.out.println("\n" + Arrays.deepToString(sudokuArray) + "\n"); // debugging purposes
-
-        SudokuSolver sudoku = new SudokuSolver(); // instantiate sudoku obj
+        SudokuSolver sudoku = new SudokuSolver(); // Instantiate SudokuSolver object
 
         // Perform relevant methods
-        sudoku.getCellOCR();
+        getCellOCR();
 
-        sudoku.answerPuzzle(sudokuArray);
+        sudoku.answerPuzzle(sudokuArray); // Solve the Sudoku puzzle
 
-        System.out.println("\n" + Arrays.deepToString(sudokuArray) + "\n");
+        // Check if the puzzle is solvable
+        if (Arrays.stream(sudokuArray).anyMatch(row -> Arrays.stream(row).anyMatch(cell -> cell == 0))) {
+            System.out.println("Not solvable");
+            return;
+        }
 
-        sudoku.typeSudokuAnswer();
+        System.out.println("\n Solved Sudoku Array:\n" + Arrays.deepToString(sudokuArray)); // Print solved Sudoku array
 
+    } // end of main method
 
-    } // end of main
-
-} // end of class
+} // end of SudokuSolver class
