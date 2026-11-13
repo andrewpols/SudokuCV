@@ -161,9 +161,31 @@ class HoughLinesRun {
         // Detect lines using Hough transform
         Imgproc.HoughLinesP(src, lines, 1, Math.PI / 180, 120, 170, 60);
 
+        // The image has been warped to a square, so the real grid lines lie on the cell boundaries
+        // (multiples of width/9 and height/9). Only paint over detected lines that sit on a boundary;
+        // otherwise digits stacked in one column are mistaken for a long line and erased.
+        final double cellW = src.width() / 9.0;
+        final double cellH = src.height() / 9.0;
+        final double tolerance = 0.2; // fraction of a cell a line may sit away from a boundary
+
         // Draw red lines over detected lines to remove them
         for (int i = 0; i < lines.rows(); i++) {
             final double[] lineInfo = lines.get(i, 0);
+
+            final double dx = Math.abs(lineInfo[2] - lineInfo[0]);
+            final double dy = Math.abs(lineInfo[3] - lineInfo[1]);
+            final double length = Math.hypot(dx, dy);
+
+            final boolean isVertical = dx <= 0.15 * length;
+            final boolean isHorizontal = dy <= 0.15 * length;
+
+            if (isVertical) {
+                if (!onBoundary(lineInfo[0], lineInfo[2], cellW, tolerance)) continue;
+            } else if (isHorizontal) {
+                if (!onBoundary(lineInfo[1], lineInfo[3], cellH, tolerance)) continue;
+            } else {
+                continue; // Diagonal strokes are never grid lines
+            }
 
             Imgproc.line(src,
                     new Point(lineInfo[0], lineInfo[1]), new Point(lineInfo[2], lineInfo[3]),
@@ -177,6 +199,16 @@ class HoughLinesRun {
 
         // Release resources
         lines.release();
+    }
+
+    // True if both ends of a line are within <tolerance> cells of the same grid boundary
+    private static boolean onBoundary(double a, double b, double cellSize, double tolerance) {
+        final long boundaryA = Math.round(a / cellSize);
+        final long boundaryB = Math.round(b / cellSize);
+
+        return boundaryA == boundaryB
+                && Math.abs(a - boundaryA * cellSize) <= tolerance * cellSize
+                && Math.abs(b - boundaryB * cellSize) <= tolerance * cellSize;
     }
 
     // Output each cell of the Sudoku grid as individual images
